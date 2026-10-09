@@ -82,6 +82,7 @@ import { useLanguage } from "../context/LanguageContext";
 import { TranslatableText } from "./TranslatableText";
 import { useCurrentUser } from "../hooks/useCurrentUser";
 import { VOICE_MODE_ENABLED } from "../config";
+import { generateUUID } from "../lib/utils";
 
 type PastTurn = {
   id: string;
@@ -4369,7 +4370,7 @@ export function CxoDashboard({
     // nothing to await here beyond the acknowledgement that it was sent.
     const mode: AnalysisMode = isReportFormatMode ? "deep-insights" : "chat";
     const isNewSession = runSessionIdRef.current === null;
-    const runSessionId = runSessionIdRef.current ?? crypto.randomUUID();
+    const runSessionId = runSessionIdRef.current ?? generateUUID();
     runSessionIdRef.current = runSessionId;
     if (mode === "chat" && isNewSession) {
       provisionalChatSessionIdRef.current = runSessionId;
@@ -4388,7 +4389,7 @@ export function CxoDashboard({
       setPastTurns((prev) => [
         ...prev,
         {
-          id: crypto.randomUUID(),
+          id: generateUUID(),
           query: streamingQuery,
           plan: reportPlan,
           report,
@@ -4465,7 +4466,7 @@ export function CxoDashboard({
   };
 
   return (
-    <div className="fixed inset-0 h-screen w-screen bg-surface-tint font-sans text-foreground flex flex-col overflow-hidden">
+    <div className="fixed inset-0 h-screen w-screen bg-surface-tint font-sans text-foreground flex overflow-hidden">
       {/* Light Theme Agent Loader */}
       {isConnectingAgents && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/35 backdrop-blur-sm animate-in fade-in duration-200">
@@ -4584,44 +4585,126 @@ export function CxoDashboard({
         </div>
       )}
 
-      {/* UNIFIED TOP HEADER - IDENTICAL ON ASK ASTYLE & INBOX */}
-      <header
-        aria-hidden={activeView === "chat" && !showChatChrome}
-        inert={activeView === "chat" && !showChatChrome}
-        className={`sticky top-0 z-40 shrink-0 bg-ink flex items-center justify-between px-3 sm:px-6 gap-3 transition-[height,opacity] duration-200 ${
-          activeView === "chat" && !showChatChrome
-            ? "h-0 overflow-hidden border-b-0 opacity-0"
-            : "h-12 overflow-visible border-b border-white/10 opacity-100"
-        }`}
+      {/* UNIFIED NAVIGATION RAIL */}
+      <nav
+        aria-label="Main menu"
+        className="flex w-14 md:w-[72px] shrink-0 flex-col items-center gap-2 pt-3.5 border-r border-border dark:border-zinc-800 overflow-visible bg-surface z-20"
       >
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Brand Logo */}
+        <button
+          type="button"
+          onClick={handleGoToAskAi}
+          className="mb-1 grid size-10 place-items-center rounded-xl transition-colors hover:bg-tile cursor-pointer select-none"
+          title="ASTYLE — Go to Chat"
+          aria-label="ASTYLE"
+        >
+          <img src="/flower-logo.png" alt="ASTYLE" className="size-6 sm:size-7 object-contain" />
+        </button>
+
+        {/* Chat */}
+        <div className="relative group flex items-center justify-center">
           <button
             type="button"
             onClick={handleGoToAskAi}
-            className="text-base sm:text-lg font-extrabold tracking-wider text-white hover:text-sky-200 transition cursor-pointer flex items-center whitespace-nowrap select-none"
-            title="ASTYLE — Go to Chat"
+            aria-label="Chat"
+            className={`relative grid size-12 place-items-center rounded-full transition-colors duration-200 cursor-pointer ${
+              activeView === "chat" && !isHistoryOpen
+                ? "bg-chip-active text-chip-active-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-tile"
+            }`}
           >
-            ASTYLE
+            <MessageSquare className="size-5" />
           </button>
+          <div className="pointer-events-none absolute left-[calc(100%+12px)] z-50 whitespace-nowrap rounded-lg bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 shadow-lg transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0.5">
+            {t("nav.chat", { defaultValue: "Chat" })}
+            <span className="absolute -left-1 top-1/2 -translate-y-1/2 border-4 border-transparent border-r-foreground" />
+          </div>
         </div>
 
-        <div className="flex-1" />
+        {/* History */}
+        <div className="relative group flex items-center justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              if (activeView !== "chat") {
+                void navigate({ to: "/ask-ai", search: { history: "open" } });
+                return;
+              }
+              setIsHistoryOpen((open) => !open);
+            }}
+            aria-label={t("nav.chatHistory", { defaultValue: "Chat History" })}
+            aria-expanded={activeView === "chat" && isHistoryOpen}
+            aria-controls={activeView === "chat" && isHistoryOpen ? "ask-ai-session-history" : undefined}
+            title={activeView === "chat" && isHistoryOpen ? t("nav.closeChatHistory", { defaultValue: "Close Chat History" }) : t("nav.openChatHistory", { defaultValue: "Open Chat History" })}
+            className={`relative grid size-12 place-items-center rounded-full transition-colors duration-200 cursor-pointer ${
+              activeView === "chat" && isHistoryOpen
+                ? "bg-chip-active text-chip-active-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-tile"
+            }`}
+          >
+            <History className="size-5" aria-hidden="true" />
+          </button>
+          <div className="pointer-events-none absolute left-[calc(100%+12px)] z-50 whitespace-nowrap rounded-lg bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 shadow-lg transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0.5">
+            {t("nav.chatHistory", { defaultValue: "Chat History" })}
+            <span className="absolute -left-1 top-1/2 -translate-y-1/2 border-4 border-transparent border-r-foreground" />
+          </div>
+        </div>
 
-        {/* Profile on right top end */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        {/* Specialists */}
+        <div className="relative group flex items-center justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              setSpecialistsRefreshKey((key) => key + 1);
+              switchView("inbox");
+            }}
+            aria-label="Specialists"
+            className={`relative grid size-12 place-items-center rounded-full transition-colors duration-200 cursor-pointer ${
+              activeView === "inbox"
+                ? "bg-chip-active text-chip-active-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground hover:bg-tile"
+            }`}
+          >
+            <UsersRound className="size-5" />
+          </button>
+          <div className="pointer-events-none absolute left-[calc(100%+12px)] z-50 whitespace-nowrap rounded-lg bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 shadow-lg transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0.5">
+            {t("nav.specialists", { defaultValue: "Specialists" })}
+            <span className="absolute -left-1 top-1/2 -translate-y-1/2 border-4 border-transparent border-r-foreground" />
+          </div>
+        </div>
+      </nav>
+
+      {/* Session History Sidebar (between Nav Rail and Workspace when on chat view) */}
+      {activeView === "chat" && isHistoryOpen && (
+        <SessionHistorySidebar
+          activeSessionId={activeSessionId}
+          onSelectSession={handleSelectSession}
+          historySessions={sessionHistoryList}
+          onDeleteSession={handleDeleteSession}
+        />
+      )}
+
+      {/* WORKSPACE AREA TO RIGHT OF RAIL */}
+      <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* Minimal Header: Language Switcher & Profile */}
+        <header
+          className="absolute top-3 right-4 sm:right-6 z-30 flex items-center gap-2.5 pointer-events-auto"
+          aria-label="User navigation"
+        >
+          {/* Language Switcher */}
           <div ref={languageMenuRef} className="relative">
             <button
               type="button"
               onClick={() => setIsLanguageMenuOpen((open) => !open)}
               aria-haspopup="menu"
               aria-expanded={isLanguageMenuOpen}
-              aria-label="Choose language"
-              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-sky-200/35 bg-white/10 px-2.5 text-xs font-semibold text-white shadow-xs transition-colors hover:border-sky-100/60 hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-200"
+              aria-label={t("header.chooseLanguage", { defaultValue: "Choose language" })}
+              className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border/80 bg-surface/85 backdrop-blur-md px-3 text-xs font-medium text-foreground shadow-2xs transition-colors hover:bg-surface hover:border-border hover:shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring cursor-pointer"
             >
-              <Languages className="size-3.5 text-sky-200" aria-hidden="true" />
+              <Languages className="size-3.5 text-muted-foreground" aria-hidden="true" />
               <span>{language === "ja" ? "日本語" : "English"}</span>
               <ChevronDown
-                className={`size-3.5 text-sky-200 transition-transform ${isLanguageMenuOpen ? "rotate-180" : ""}`}
+                className={`size-3 text-muted-foreground transition-transform duration-150 ${isLanguageMenuOpen ? "rotate-180" : ""}`}
                 aria-hidden="true"
               />
             </button>
@@ -4645,7 +4728,7 @@ export function CxoDashboard({
                       setLanguage(option.value);
                       setIsLanguageMenuOpen(false);
                     }}
-                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-medium transition-colors ${
+                    className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left font-medium transition-colors cursor-pointer ${
                       language === option.value
                         ? "bg-chip-active text-chip-active-foreground"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -4660,108 +4743,20 @@ export function CxoDashboard({
               </div>
             )}
           </div>
-          <div className="text-right hidden sm:block">
-            <p className="text-xs font-medium leading-none text-white">{currentUser.name}</p>
-            <p className="text-[10px] text-sky-200/70 mt-0.5">{currentUser.email}</p>
+
+          {/* Profile */}
+          <div
+            className="flex items-center gap-2 rounded-full border border-border/80 bg-surface/85 backdrop-blur-md py-1 pl-3 pr-1 shadow-2xs hover:shadow-xs transition-shadow"
+            title={currentUser.email}
+          >
+            <span className="hidden sm:inline text-xs font-medium text-foreground select-none">
+              {currentUser.name}
+            </span>
+            <span className="grid size-6 sm:size-6.5 place-items-center rounded-full bg-[oklch(0.68_0.15_55)] text-[11px] sm:text-xs font-semibold text-white shadow-2xs select-none">
+              {currentUser.initial}
+            </span>
           </div>
-          <span className="grid size-7 sm:size-8 place-items-center rounded-full bg-[oklch(0.68_0.15_55)] text-xs sm:text-sm font-medium text-white shadow-xs">
-            {currentUser.initial}
-          </span>
-        </div>
-      </header>
-
-      {/* MAIN CONTAINER WITH UNIFIED NAVIGATION RAIL */}
-      <div className="relative flex flex-1 min-h-0 overflow-hidden">
-        {/* Navigation Rail - SAME across both views */}
-        <nav
-          aria-label="Main menu"
-          className="flex w-14 md:w-[72px] shrink-0 flex-col items-center gap-2 pt-3 border-r border-border dark:border-zinc-800 overflow-visible bg-surface z-10"
-        >
-          {/* Chat */}
-          <div className="relative group flex items-center justify-center">
-            <button
-              type="button"
-              onClick={handleGoToAskAi}
-              aria-label="Chat"
-              className={`relative grid size-12 place-items-center rounded-full transition-colors duration-200 cursor-pointer ${
-                activeView === "chat" && !isHistoryOpen
-                  ? "bg-chip-active text-chip-active-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-tile"
-              }`}
-            >
-              <MessageSquare className="size-5" />
-            </button>
-            <div className="pointer-events-none absolute left-[calc(100%+12px)] z-50 whitespace-nowrap rounded-lg bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 shadow-lg transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0.5">
-              {t("nav.chat", { defaultValue: "Chat" })}
-              <span className="absolute -left-1 top-1/2 -translate-y-1/2 border-4 border-transparent border-r-foreground" />
-            </div>
-          </div>
-
-          {/* History */}
-          <div className="relative group flex items-center justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                if (activeView !== "chat") {
-                  void navigate({ to: "/ask-ai", search: { history: "open" } });
-                  return;
-                }
-                setIsHistoryOpen((open) => !open);
-              }}
-              aria-label={t("nav.chatHistory", { defaultValue: "Chat History" })}
-              aria-expanded={activeView === "chat" && isHistoryOpen}
-              aria-controls={activeView === "chat" && isHistoryOpen ? "ask-ai-session-history" : undefined}
-              title={activeView === "chat" && isHistoryOpen ? t("nav.closeChatHistory", { defaultValue: "Close Chat History" }) : t("nav.openChatHistory", { defaultValue: "Open Chat History" })}
-              className={`relative grid size-12 place-items-center rounded-full transition-colors duration-200 cursor-pointer ${
-                activeView === "chat" && isHistoryOpen
-                  ? "bg-chip-active text-chip-active-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-tile"
-              }`}
-            >
-              <History className="size-5" aria-hidden="true" />
-            </button>
-            <div className="pointer-events-none absolute left-[calc(100%+12px)] z-50 whitespace-nowrap rounded-lg bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 shadow-lg transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0.5">
-              {t("nav.chatHistory", { defaultValue: "Chat History" })}
-              <span className="absolute -left-1 top-1/2 -translate-y-1/2 border-4 border-transparent border-r-foreground" />
-            </div>
-          </div>
-
-          {/* Specialists */}
-          <div className="relative group flex items-center justify-center">
-            <button
-              type="button"
-              onClick={() => {
-                setSpecialistsRefreshKey((key) => key + 1);
-                switchView("inbox");
-              }}
-              aria-label="Specialists"
-              className={`relative grid size-12 place-items-center rounded-full transition-colors duration-200 cursor-pointer ${
-                activeView === "inbox"
-                  ? "bg-chip-active text-chip-active-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground hover:bg-tile"
-              }`}
-            >
-              <UsersRound className="size-5" />
-            </button>
-            <div className="pointer-events-none absolute left-[calc(100%+12px)] z-50 whitespace-nowrap rounded-lg bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 shadow-lg transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0.5">
-              {t("nav.specialists", { defaultValue: "Specialists" })}
-              <span className="absolute -left-1 top-1/2 -translate-y-1/2 border-4 border-transparent border-r-foreground" />
-            </div>
-          </div>
-        </nav>
-
-        {/* Session History Sidebar (between Nav Rail and Workspace when on chat view) */}
-        {activeView === "chat" && isHistoryOpen && (
-          <SessionHistorySidebar
-            activeSessionId={activeSessionId}
-            onSelectSession={handleSelectSession}
-            historySessions={sessionHistoryList}
-            onDeleteSession={handleDeleteSession}
-          />
-        )}
-
-        {/* WORKSPACE AREA TO RIGHT OF RAIL */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+        </header>
           {activeView === "chat" ? (
             geminiMessages.length === 0 &&
             !isGeminiLoading &&
@@ -4997,7 +4992,7 @@ export function CxoDashboard({
                 <div
                   ref={conversationStreamRef}
                   onScroll={handleConversationScroll}
-                  className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-6 pb-28 z-10"
+                  className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 pt-14 sm:pt-16 pb-28 z-10"
                 >
                   <div className="mx-auto max-w-[58rem] space-y-6 pb-6">
                     {/* Stored messages are always older than turns created in
@@ -6194,7 +6189,6 @@ export function CxoDashboard({
             <SpecialistsView refreshKey={specialistsRefreshKey} />
           )}
         </div>
-      </div>
 
       {/* FULL SCREEN EVIDENCE VERIFICATION & DATASET VIEW WITH ASK AI ON THE RIGHT */}
       {activeEvidenceDataset && (

@@ -171,11 +171,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {/* Provided in the shell, not RootComponent: the root error and
             not-found components replace RootComponent and use translations. */}
         <LanguageProvider>{children}</LanguageProvider>

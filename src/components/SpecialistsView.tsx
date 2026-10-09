@@ -12,6 +12,7 @@ import { ConversationList } from "./ConversationList";
 import { useSocket } from "./SocketProvider";
 import { useLanguage } from "../context/LanguageContext";
 import { TranslatableText } from "./TranslatableText";
+import { generateUUID } from "../lib/utils";
 
 type LocalTurn = {
   id: string;
@@ -97,7 +98,7 @@ export function SpecialistsView({ refreshKey }: { refreshKey: number }) {
     const query = draft.trim();
     if (agentId === null || query === "" || isReplyPending) return;
 
-    const id = crypto.randomUUID();
+    const id = generateUUID();
     setLocalTurns((previous) => [
       ...previous.filter(
         (turn) => !(turn.agentId === agentId && turn.query === query && turn.status === "failed"),
@@ -340,7 +341,7 @@ export function SpecialistsView({ refreshKey }: { refreshKey: number }) {
             </button>
             <div
               ref={conversationScrollRef}
-              className="subtle-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6"
+              className="subtle-scrollbar min-h-0 flex-1 overflow-y-auto px-4 pt-14 pb-6 sm:px-6 sm:pt-16"
             >
               <div className="mx-auto max-w-[58rem]">
                 {conversationsError !== null ? (

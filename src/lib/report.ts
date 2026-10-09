@@ -749,9 +749,8 @@ export function parseReportEvent(rawEvent: unknown): Report | null {
   let body: unknown = rawEvent["response"];
   if (typeof body === "string") {
     const rawJson = body;
-    try {
-      body = JSON.parse(rawJson);
-    } catch {
+    body = parseReportJsonText(rawJson);
+    if (body === undefined) {
       console.error("[report] could not parse response", {
         sessionId: envelopeSessionId,
         length: rawJson.length,
@@ -774,6 +773,63 @@ export function parseReportEvent(rawEvent: unknown): Report | null {
   }
 
   return toReport(body, envelopeSessionId, conversationId);
+}
+
+/**
+ * Resiliently parse report JSON that may arrive wrapped in markdown fences,
+ * with conversational preambles/postambles, or double-encoded.
+ */
+function parseReportJsonText(value: string): unknown {
+  const source = value.trim();
+  const candidates: string[] = [source];
+
+  // 1. Markdown code fence stripping
+  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(source);
+  if (fenced?.[1] !== undefined) candidates.push(fenced[1].trim());
+
+  const unwrapped = unwrapJsonFence(source);
+  if (unwrapped !== source) candidates.push(unwrapped);
+
+  // 2. Extract slice between first { and last }
+  const firstObject = source.indexOf("{");
+  const lastObject = source.lastIndexOf("}");
+  if (firstObject !== -1 && lastObject > firstObject) {
+    candidates.push(source.slice(firstObject, lastObject + 1));
+  }
+
+  // 3. Try standard candidates
+  for (const candidate of candidates) {
+    try {
+      let parsed: unknown = JSON.parse(candidate);
+      if (typeof parsed === "string") {
+        try {
+          parsed = JSON.parse(parsed.trim());
+        } catch {
+          // keep as parsed
+        }
+      }
+      if (parsed && typeof parsed === "object") {
+        return parsed;
+      }
+    } catch {
+      // Try next candidate
+    }
+  }
+
+  // 4. Try lenient trailing-comma cleanups before closing braces
+  for (const candidate of candidates) {
+    try {
+      const sanitized = candidate.replace(/,\s*([}\]])/g, "$1");
+      const parsed: unknown = JSON.parse(sanitized);
+      if (parsed && typeof parsed === "object") {
+        return parsed;
+      }
+    } catch {
+      // Continue
+    }
+  }
+
+  return undefined;
 }
 
 /**
